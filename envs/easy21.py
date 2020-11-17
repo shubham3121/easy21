@@ -109,8 +109,8 @@ class Easy21Numpy(object):
         return draw_card(np_random) * card_color(np_random)
 
     @staticmethod
-    def _is_bust(state):
-        return False if 1 <= state <= 21 else True
+    def _is_bust(hand_value):
+        return False if 1 <= hand_value <= 21 else True
 
     def reset(self):
         """Returns the fully observed states for player and dealer respectively."""
@@ -135,7 +135,7 @@ class Easy21Numpy(object):
 
         if action:  # hit: draw another card from the deck
             player += self._draw_hand(self.np_random)
-            if is_bust(state):
+            if self._is_bust(player):
                 done = True
                 reward = -1
             else:
@@ -143,9 +143,9 @@ class Easy21Numpy(object):
                 done = False
         else:  # stick: play out the dealers hand, and score
             done = True
-            while dealer < 17:
+            while 0 < dealer <= 17:
                 dealer += self._draw_hand(self.np_random)
-            reward = cmp(state, dealer)
+            reward = cmp(player, dealer)
 
         next_state = [player, dealer]
         return next_state, reward, done
