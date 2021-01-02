@@ -115,7 +115,7 @@ class Easy21Numpy(object):
     def reset(self):
         """Returns the fully observed states for player and dealer respectively."""
         observed_state = draw_card(self.np_random) * BLACK
-        return [observed_state, observed_state]
+        return observed_state, observed_state
 
     def step(self, state, action):
         """Based on the current state and action, returns:
@@ -147,5 +147,5 @@ class Easy21Numpy(object):
                 dealer += self._draw_hand(self.np_random)
             reward = cmp(player, dealer)
 
-        next_state = [player, dealer]
+        next_state = (player, dealer)
         return next_state, reward, done
