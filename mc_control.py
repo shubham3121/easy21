@@ -15,11 +15,12 @@ class MonteCarloControl(object):
     Plots the optimal value function V*(s) = max_a(Q*(s,a)), similar to the figure in Sutton and Barto's
     Blackjack example.
     """
-    def __init__(self, N_o=100):
+    def __init__(self, n_o=100, gamma=0.01):
         self.env = Easy21Numpy()
         self.Q_val = defaultdict(lambda: np.zeros(self.env.na))
         self.n_S = defaultdict(int)
-        self.n_o = N_o
+        self.n_o = n_o
+        self.gamma = gamma
 
     def generate_episode(self, policy=None):
         """
@@ -32,7 +33,7 @@ class MonteCarloControl(object):
         episode = []
         state = self.env.reset()
 
-        for _ in range(self.n_o):
+        while True:
             action = policy[state] if policy else np.random.choice(self.env.actions)
             next_state, reward, done = self.env.step(state, action)
             episode.append((state, action, reward))
@@ -42,67 +43,48 @@ class MonteCarloControl(object):
 
         return episode
 
-    def mc_policy_evaluation(self, episode):
-        """
-        Monte Carlo Policy Evaluation. For the given episode, updates the action-value
-        function.
-
-        Args:
-            episode (list): List of state, action, reward.
-
-        """
-        for state, action, reward in episode:
-            self.n_S[state] += 1
-            self.Q_val[state][action] += (reward - self.Q_val[state][action]) / self.n_S[state]
-
     def epsilon_greedy_exploration(self, state):
         """Returns the action for given state based on
         greedy exploration.
         """
         epsilon = self.n_o / (self.n_o + self.n_S[state])
 
-        if np.random.rand() <= epsilon:
+        if np.random.rand() < epsilon:
             action = np.random.choice(self.env.actions)
         else:
             action = np.argmax(self.Q_val[state])
 
         return action
 
-    def mc_policy_improvement(self):
-        """
-        Monte-Carlo Improvement. Evaluates and updates the policy based on the current Q
-        values using epsilon-greedy exploration method.
-
-        Returns:
-            dict: the new improved policy (mapping of states to actions).
-        """
-        policy = defaultdict(int)
-
-        for state in self.Q_val:
-            action = self.epsilon_greedy_exploration(state)
-            policy[state] = action
-
-        return policy
-
-    def run_one_step(self, policy=None):
-        """
-        Evaluate and improve the policy for one step.
+    def off_policy_mc_control(self, policy=None):
+        """Off policy monte carlo control. The method demonstrates the following:
+        1. Generate an episode.
+        2. For each step in the episode:
+            - improve the value function for given state.
+            - improve the policy for the given state using epsilon-greedy approach.
 
         Args:
-            policy (dict): current policy used by the environment.
+            policy (dict): state to action map.
         Returns:
-            dict: new improved policy.
+            dict: updated policy.
         """
+        agg_reward = 0
         episode = self.generate_episode(policy=policy)
-        self.mc_policy_evaluation(episode)
-        policy = self.mc_policy_improvement()
+        policy = defaultdict(int) if policy is None else policy
+
+        # for given step in the episode.
+        for state, action, reward in episode:
+            # calculate the aggreated reward.
+            agg_reward = self.gamma*agg_reward + reward
+            self.n_S[state] += 1  # number of times the state is visited.
+            # update the action-value function.
+            self.Q_val[state][action] += (agg_reward - self.Q_val[state][action]) / self.n_S[state]
+            policy[state] = self.epsilon_greedy_exploration(state)  # update the policy
+
         return policy
 
     def run(self, iterations=10000):
-        """
-        Evaluates the action-value function and improves the policy
-        for given number of iterations.
-
+        """Evaluates and updates the policy for the given number of iterations.
         Args:
             iterations: Number of iterations allowed.
         """
@@ -110,15 +92,16 @@ class MonteCarloControl(object):
         counter = 0
 
         while counter < iterations:
-            new_policy = self.run_one_step(policy=best_policy)
+            new_policy = self.off_policy_mc_control(
+                best_policy
+            )
             best_policy = new_policy
             counter += 1
             if counter % int(iterations * 0.01) == 0:
                 print("Progress: {:2.1%}".format(counter/iterations), end="\r")
 
     def plot(self):
-        """
-        Plots the value functions corresponding to the player
+        """Plots the value functions corresponding to the player
         and dealer hand values.
         """
         vs_prime = calc_value_function(self.Q_val)
